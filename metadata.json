@@ -1,0 +1,6 @@
+{
+  "name": "Лабораторія читання",
+  "description": "Вебзастосунок для вчителів початкової школи для створення дидактичних завдань з читання на основі будь-якого тексту.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
