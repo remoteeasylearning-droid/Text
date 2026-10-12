@@ -7,7 +7,8 @@ import { InputPanel } from './components/InputPanel';
 import { TaskList } from './components/TaskList';
 import { PrintModal } from './components/PrintModal';
 import { MethodologyGuideModal } from './components/MethodologyGuideModal';
-import { AlertCircle, CheckCircle2, Sparkles, BookOpen } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Sparkles, BookOpen, Info } from 'lucide-react';
+import { generateLocalTasks } from './utils/localTaskGenerator';
 
 export default function App() {
   const [text, setText] = useState<string>(SAMPLE_TEXTS[0].text);
@@ -20,6 +21,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
+  const [isStaticMode, setIsStaticMode] = useState<boolean>(false);
 
   // Modals
   const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
@@ -48,11 +50,19 @@ export default function App() {
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Помилка генерації завдань.');
+        // If endpoint is not found (e.g. running as static site on GitHub Pages)
+        if (response.status === 404) {
+          const fallbackTasks = generateLocalTasks(text, ageGroup, selectedSkills, variant || 1);
+          setTasks(fallbackTasks);
+          setIsStaticMode(true);
+          return;
+        }
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Помилка сервера (${response.status})`);
       }
+
+      const data = await response.json();
 
       const generatedTasks: ReadingTask[] = (data.tasks || []).map(
         (t: any, index: number) => ({
@@ -67,12 +77,13 @@ export default function App() {
       );
 
       setTasks(generatedTasks);
+      setIsStaticMode(false);
     } catch (err: any) {
-      console.error('Generation Error:', err);
-      setError(
-        err.message ||
-          'Не вдалося згенерувати завдання. Будь ласка, спробуйте ще раз.'
-      );
+      console.warn('API unavailable or failed, using local methodology generator:', err);
+      // Fallback for static hosts (GitHub Pages) or offline mode
+      const fallbackTasks = generateLocalTasks(text, ageGroup, selectedSkills, variant || 1);
+      setTasks(fallbackTasks);
+      setIsStaticMode(true);
     } finally {
       setIsLoading(false);
     }
@@ -205,6 +216,24 @@ ${task.teacherAnswer}
             <button
               onClick={() => setError(null)}
               className="text-rose-500 hover:text-rose-700 font-bold"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Static Mode / Offline Fallback Notice */}
+        {isStaticMode && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start space-x-3 text-amber-900 text-sm">
+            <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="grow">
+              <span className="font-bold">Автономний методичний режим: </span>
+              Завдання створено за дидактичними шаблонами НУШ. На статичному хостингу GitHub Pages серверний бекенд із моделлю Gemini AI недоступний.
+            </div>
+            <button
+              onClick={() => setIsStaticMode(false)}
+              className="text-amber-500 hover:text-amber-700 font-bold"
+              title="Закрити"
             >
               ×
             </button>
